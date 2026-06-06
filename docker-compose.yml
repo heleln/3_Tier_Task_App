@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # 1. Database Tier (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: task_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: todo_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # 2. Logic Tier (Python Flask Backend)
+  backend:
+    build: ./backend
+    container_name: task_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=todo_db
+    depends_on:
+      - db
+
+  # 3. Presentation Tier (Nginx Frontend)
+  frontend:
+    build: ./frontend
+    container_name: task_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
