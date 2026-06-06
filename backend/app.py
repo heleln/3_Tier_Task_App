@@ -4,7 +4,7 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 # Allow requests from your local machine and your upcoming Render frontend URL
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Automatically switch between Render Cloud DB (PostgreSQL) and local DB (MySQL)
 DATABASE_URL = os.environ.get('DATABASE_URL')
