@@ -23,11 +23,8 @@
     </div>
 
     <script>
-        // When running locally, it points to localhost. 
-        // When deployed to the cloud, it dynamically talks to your AWS endpoints.
+        // Points directly to your live Render backend API
         const API_URL = 'https://three-tier-task-app.onrender.com/api/tasks';
-        
-    
 
         async function fetchTasks() {
             try {
@@ -47,16 +44,17 @@
 
         async function addTask() {
             const input = document.getElementById('taskInput');
-            if (!input.value) return;
+            const title = input.value.trim();
+            if (!title) return;
 
             try {
                 await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: input.value })
+                    body: JSON.stringify({ title: title })
                 });
                 input.value = '';
-                fetchTasks();
+                fetchTasks(); // Refresh list after adding
             } catch (err) {
                 console.error("Error adding task:", err);
             }
