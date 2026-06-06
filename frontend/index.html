@@ -23,7 +23,6 @@
     </div>
 
     <script>
-        // Points directly to your live Render backend API
         const API_URL = 'https://three-tier-task-app.onrender.com/api/tasks';
 
         async function fetchTasks() {
@@ -54,13 +53,12 @@
                     body: JSON.stringify({ title: title })
                 });
                 input.value = '';
-                fetchTasks(); // Refresh list after adding
+                fetchTasks();
             } catch (err) {
                 console.error("Error adding task:", err);
             }
         }
 
-        // Load tasks automatically when the page opens
         fetchTasks();
     </script>
 </body>
