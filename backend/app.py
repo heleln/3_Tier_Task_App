@@ -1,6 +1,6 @@
 import os
 import psycopg2
-
+import bcrypt
 # Automatically run database migrations on startup
 def run_db_migrations():
     database_url = os.environ.get('DATABASE_URL')
@@ -41,6 +41,72 @@ def run_db_migrations():
 
 # Trigger the setup function right away
 run_db_migrations()
+# 1. USER REGISTRATION ENDPOINT
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    # Securely hash the password
+    bytes_password = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    password_hash = bcrypt.hashpw(bytes_password, salt).decode('utf-8')
+
+    try:
+        conn = get_db_connection() # Uses your existing connection helper
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "INSERT INTO users (username, password_hash) VALUES (%s, %s) RETURNING id;",
+            (username, password_hash)
+        )
+        user_id = cursor.fetchone()[0]
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        return jsonify({"message": "User registered successfully", "user_id": user_id}), 201
+
+    except psycopg2.errors.UniqueViolation:
+        return jsonify({"error": "Username already exists"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Registration failed: {str(e)}"}), 500
+
+
+# 2. USER LOGIN ENDPOINT
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT id, password_hash FROM users WHERE username = %s;", (username,))
+        user_record = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+
+        if user_record:
+            user_id, stored_hash = user_record
+            # Verify password match
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8')):
+                return jsonify({"message": "Login successful", "user_id": user_id}), 200
+        
+        return jsonify({"error": "Invalid username or password"}), 401
+
+    except Exception as e:
+        return jsonify({"error": f"Login failed: {str(e)}"}), 500
 import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
