@@ -7,27 +7,145 @@
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 50px; text-align: center; }
         .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
-        input[type="text"] { width: 70%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 10px 15px; border: none; background-color: #28a745; color: white; border-radius: 5px; cursor: pointer; }
+        input[type="text"], input[type="password"] { width: 85%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 15px; border: none; background-color: #28a745; color: white; border-radius: 5px; cursor: pointer; width: 45%; margin: 5px; }
         button:hover { background-color: #218838; }
+        .btn-link { background: none; color: #007bff; width: auto; text-decoration: underline; }
+        .btn-link:hover { background: none; color: #0056b3; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-danger:hover { background-color: #bd2130; }
         ul { list-style-type: none; padding: 0; margin-top: 20px; text-align: left; }
         li { padding: 10px; background: #eee; margin-bottom: 5px; border-radius: 5px; }
+        .d-none { display: none !important; }
+        .auth-box { border-bottom: 2px solid #f4f4f9; margin-bottom: 20px; padding-bottom: 15px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Task Manager</h2>
-        <input type="text" id="taskInput" placeholder="Enter a new task...">
-        <button onclick="addTask()">Add</button>
-        <ul id="taskList"></ul>
+        <div class="auth-box">
+            <div id="authFormBox">
+                <h2 id="authTitle">Login</h2>
+                <input type="text" id="authUsername" placeholder="Enter username">
+                <input type="password" id="authPassword" placeholder="Enter password">
+                <div>
+                    <button id="authPrimaryBtn" onclick="handleAuth()">Login</button>
+                    <button class="btn-link" id="authToggleBtn" onclick="toggleAuthMode()">Need an account? Register</button>
+                </div>
+            </div>
+            
+            <div id="loggedInBox" class="d-none">
+                <p>Logged in as: <strong id="displayUsername"></strong></p>
+                <button class="btn-danger" style="width: auto;" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+
+        <div id="taskInterface" class="d-none">
+            <h2>Task Manager</h2>
+            <input type="text" id="taskInput" placeholder="Enter a new task..." style="width: 70%; margin-bottom: 0;">
+            <button onclick="addTask()" style="width: auto;">Add</button>
+            <ul id="taskList"></ul>
+        </div>
     </div>
 
     <script>
-        const API_URL = 'https://three-tier-task-app.onrender.com/api/tasks';
+        const API_BASE_URL = 'https://three-tier-task-app.onrender.com/api';
+        let authMode = "login"; 
 
-        async function fetchTasks() {
+        // Initial setup on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            checkUserSession();
+        });
+
+        function toggleAuthMode() {
+            const title = document.getElementById("authTitle");
+            const primaryBtn = document.getElementById("authPrimaryBtn");
+            const toggleBtn = document.getElementById("authToggleBtn");
+            
+            if (authMode === "login") {
+                authMode = "register";
+                title.innerText = "Register";
+                primaryBtn.innerText = "Register";
+                toggleBtn.innerText = "Already have an account? Login";
+            } else {
+                authMode = "login";
+                title.innerText = "Login";
+                primaryBtn.innerText = "Login";
+                toggleBtn.innerText = "Need an account? Register";
+            }
+        }
+
+        async function handleAuth() {
+            const username = document.getElementById("authUsername").value.trim();
+            const password = document.getElementById("authPassword").value;
+            
+            if (!username || !password) {
+                alert("Please complete both username and password fields.");
+                return;
+            }
+            
+            const endpoint = authMode === "login" ? "/login" : "/register";
+            
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert(data.error || "Authentication failed.");
+                    return;
+                }
+                
+                if (authMode === "login") {
+                    localStorage.setItem("user_id", data.user_id);
+                    localStorage.setItem("username", username);
+                    // Clear input fields
+                    document.getElementById("authUsername").value = "";
+                    document.getElementById("authPassword").value = "";
+                    checkUserSession();
+                } else {
+                    alert("Registration successful! You can now log in.");
+                    authMode = "login";
+                    toggleAuthMode();
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Could not connect to the backend server.");
+            }
+        }
+
+        function checkUserSession() {
+            const userId = localStorage.getItem("user_id");
+            const username = localStorage.getItem("username");
+            
+            const authFormBox = document.getElementById("authFormBox");
+            const loggedInBox = document.getElementById("loggedInBox");
+            const taskInterface = document.getElementById("taskInterface");
+
+            if (userId) {
+                authFormBox.classList.add("d-none");
+                loggedInBox.classList.remove("d-none");
+                taskInterface.classList.remove("d-none");
+                document.getElementById("displayUsername").innerText = username;
+                fetchTasks(userId);
+            } else {
+                authFormBox.classList.remove("d-none");
+                loggedInBox.classList.add("d-none");
+                taskInterface.classList.add("d-none");
+            }
+        }
+
+        function handleLogout() {
+            localStorage.clear();
+            checkUserSession();
+        }
+
+        async function fetchTasks(userId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/tasks?user_id=${userId}`);
                 const tasks = await response.json();
                 const list = document.getElementById('taskList');
                 list.innerHTML = '';
@@ -44,22 +162,21 @@
         async function addTask() {
             const input = document.getElementById('taskInput');
             const title = input.value.trim();
-            if (!title) return;
+            const userId = localStorage.getItem("user_id");
+            if (!title || !userId) return;
 
             try {
-                await fetch(API_URL, {
+                await fetch(`${API_BASE_URL}/tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: title })
+                    body: JSON.stringify({ title: title, user_id: userId })
                 });
                 input.value = '';
-                fetchTasks();
+                fetchTasks(userId);
             } catch (err) {
                 console.error("Error adding task:", err);
             }
         }
-
-        fetchTasks();
     </script>
 </body>
 </html>
